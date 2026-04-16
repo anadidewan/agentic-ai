@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 from langchain_google_genai import ChatGoogleGenerativeAI
-from app.core.config import settings
+from app.config import settings
 
 
 class VerificationResult(BaseModel):

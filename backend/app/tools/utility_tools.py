@@ -1,4 +1,5 @@
 from langchain.tools import tool
+from app.services.agent_trace_service import agent_trace_service
 
 
 @tool("summarize_context")
@@ -9,6 +10,10 @@ def summarize_context(context: str, max_points: int = 5) -> str:
     To be when retrieved text is too long or repetitive and should be
     condensed before final answer generation.
     """
+    agent_trace_service.add_tool_call(
+        tool_name="summarize_context",
+        input_data={"context": context, "max_points": max_points},
+    )
     lines = [line.strip() for line in context.splitlines() if line.strip()]
     condensed = lines[:max_points]
     if not condensed:
@@ -24,6 +29,10 @@ def calculator(expression: str) -> str:
     to be used for numeric reasoning such as growth rate, deltas, percentages,
     totals, and averages.
     """
+    agent_trace_service.add_tool_call(
+        tool_name="calculator",
+        input_data={"expression": expression},
+    )
     try:
         allowed_names = {}
         result = eval(expression, {"__builtins__": {}}, allowed_names)

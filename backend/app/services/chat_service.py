@@ -1,4 +1,4 @@
-from backend.app.services import agent_service
+from app.services.agent_service import agent_service
 from fastapi import HTTPException
 
 from app.store.chat_store import (
@@ -32,15 +32,17 @@ def process_chat_message(session_id: str, user_message: str) -> dict:
     try:
         
         logger.info("Agent-based chat processing | session=%s", session_id)
-        answer = agent_service.run(user_message=user_message, history=history)
+        agent_result = agent_service.run(user_message=user_message, history=history)
+        answer = agent_result["answer"]
+
 
         save_message(session_id, "assistant", answer)
 
         return {
             "session_id": session_id,
             "answer": answer,
-            "sources": [],
-            "retrieved_chunks": [],
+            "sources": agent_result.get("sources", []),
+            "retrieved_chunks": agent_result.get("retrieved_chunks", []),
             "mode": "agent",
             "routing_label": "agent",
         }

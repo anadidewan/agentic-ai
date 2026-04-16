@@ -1,12 +1,14 @@
 from langchain.agents import create_agent
 from langchain_google_genai import ChatGoogleGenerativeAI
 from app.services.verification_service import verification_service
+from app.services.agent_trace_service import agent_trace_service
+
 
 from app.tools.document_tools import document_search
 from app.tools.kg_tools import knowledge_graph_lookup
 from app.tools.utility_tools import summarize_context, calculator
-from app.tools.web_tools import web_search
-from app.core.config import settings
+# from app.tools.web_tools import web_search
+from app.config import settings
 from app.utils.custom_logger import get_logger
 logger = get_logger(__name__)
 
@@ -23,7 +25,7 @@ class AgentService:
             knowledge_graph_lookup,
             summarize_context,
             calculator,
-            web_search,
+            # web_search,
         ]
 
         self.agent = create_agent(
@@ -39,7 +41,7 @@ class AgentService:
                 "Answer clearly and include the evidence you used."
             ),
         )
-        
+
     def run(self, user_message: str, history: list[dict] | None = None) -> str:
         messages = []
 
@@ -67,15 +69,25 @@ class AgentService:
         if isinstance(content, str):
             return content
 
-        if isinstance(content, list):
+        elif isinstance(content, list):
             text_parts = []
             for block in content:
                 if isinstance(block, dict) and block.get("type") == "text":
                     text_parts.append(block.get("text", ""))
-            if text_parts:
-                return "\n".join(text_parts).strip()
+            answer = "\n".join(text_parts).strip() if text_parts else "I could not generate a response."
 
-        return str(content) if content is not None else "I could not generate a response."
+        else:
+            answer = str(content) if content is not None else "I could not generate a response."
+
+        trace = agent_trace_service.snapshot()
+
+        return {
+            "answer": answer,
+            "retrieved_chunks": trace["retrieved_chunks"],
+            "sources": trace["sources"],
+            "tool_calls": trace["tool_calls"],
+        }
+
 
 
 
