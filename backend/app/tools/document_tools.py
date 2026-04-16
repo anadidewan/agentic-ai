@@ -12,11 +12,10 @@ def document_search(query: str, top_k: int = 5, document_name: Optional[str] = N
         top_k: Number of chunks to retrieve.
         document_name: Optional document filter when the user names a specific document.
     """
-    results = retrieval_service.hybrid_retrieve(
-        query=query,
-        top_k=top_k,
-        document_name=document_name,
-    )
+    try:
+        results = retrieval_service.hybrid_retrieve(query, top_k=top_k)
+    except Exception as e:
+        return f"Document search failed: {str(e)}"
 
     if not results:
         return "No relevant document chunks were found."
@@ -24,10 +23,11 @@ def document_search(query: str, top_k: int = 5, document_name: Optional[str] = N
     formatted = []
     for i, chunk in enumerate(results, start=1):
         formatted.append(
-            f"[Chunk {i}] "
-            f"Document: {chunk.document_name}\n"
-            f"Chunk ID: {chunk.chunk_id}\n"
-            f"Content: {chunk.text}\n"
+            f"[Chunk {i}]\n"
+            f"Document: {chunk['document_name']}\n"
+            f"Chunk ID: {chunk['chunk_id']}\n"
+            f"Hybrid Score: {round(chunk.get('hybrid_score', 0.0), 4)}\n"
+            f"Text: {chunk['text']}\n"
         )
 
     return "\n".join(formatted)

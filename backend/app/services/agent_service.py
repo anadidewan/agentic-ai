@@ -7,7 +7,8 @@ from app.tools.kg_tools import knowledge_graph_lookup
 from app.tools.utility_tools import summarize_context, calculator
 from app.tools.web_tools import web_search
 from app.core.config import settings
-
+from app.utils.custom_logger import get_logger
+logger = get_logger(__name__)
 
 class AgentService:
     def __init__(self):
@@ -38,34 +39,44 @@ class AgentService:
                 "Answer clearly and include the evidence you used."
             ),
         )
-    def run(self, question: str) -> str:
-        result = self.agent.invoke(
-            {"messages": [{"role": "user", "content": question}]}
-        )
+        
+    def run(self, user_message: str, history: list[dict] | None = None) -> str:
+        messages = []
 
-        messages = result.get("messages", [])
-        if not messages:
+        if history:
+            for msg in history[-6:]:
+                role = msg.get("role", "user")
+                content = msg.get("content", "")
+                if role in {"user", "assistant"} and content:
+                    messages.append({"role": role, "content": content})
+
+        messages.append({"role": "user", "content": user_message})
+
+        logger.info("Agent run started | message_len=%d", len(user_message))
+
+        result = self.agent.invoke({"messages": messages})
+        result_messages = result.get("messages", [])
+
+        if not result_messages:
+            logger.warning("Agent returned no messages")
             return "I could not generate a response."
 
-        answer = messages[-1].content
-        verification = verification_service.verify(question, answer)
+        final_message = result_messages[-1]
+        content = getattr(final_message, "content", None)
 
-        if verification.needs_retry:
-            retry_prompt = (
-                f"The previous answer was insufficient.\n"
-                f"Feedback: {verification.feedback}\n"
-                f"Question: {question}\n"
-                f"Try again, use tools more effectively, and provide a grounded answer."
-            )
+        if isinstance(content, str):
+            return content
 
-            retry_result = self.agent.invoke(
-                {"messages": [{"role": "user", "content": retry_prompt}]}
-            )
-            retry_messages = retry_result.get("messages", [])
-            if retry_messages:
-                return retry_messages[-1].content
+        if isinstance(content, list):
+            text_parts = []
+            for block in content:
+                if isinstance(block, dict) and block.get("type") == "text":
+                    text_parts.append(block.get("text", ""))
+            if text_parts:
+                return "\n".join(text_parts).strip()
 
-        return answer
+        return str(content) if content is not None else "I could not generate a response."
+
 
 
 agent_service = AgentService()
